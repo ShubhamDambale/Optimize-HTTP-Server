@@ -1,52 +1,54 @@
-const express = require('express');
+const http = require('http');
 const fs = require('fs');
-const readline = require('readline');
+const url = require('url');
 
-const app = express();
-const PORT = 8080;
+const server = http.createServer((req, res) => {
+    const queryObject = url.parse(req.url, true).query;
+    const fileName = queryObject.n;
+    const lineNumber = queryObject.m;
 
-app.get('/data', (req, res) => {
-  const { n, m } = req.query;
-  const filePath = `/tmp/data/${n}.txt`;
+    console.log('Request URL:', req.url);
+    console.log('Query Parameters:', queryObject);
 
-  console.log('Request URL:', req.url);
-  console.log('Query Parameters:', queryObject);
+    console.log('File Name:', fileName);
 
+    if (!fileName) {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('File name not provided');
+        return;
+    }
 
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).send('File not found');
-  }
+    const filePath = `./tmp/data/${fileName}.txt`;
+    console.log('File Path:', filePath);
 
-  if (m) {
-    const fileStream = fs.createReadStream(filePath);
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity
-    });
-
-    let lineNumber = 0;
-    rl.on('line', (line) => {
-      lineNumber++;
-      if (lineNumber === parseInt(m)) {
-        rl.close();
-        res.send(line);
-      }
-    });
-
-    rl.on('close', () => {
-      res.status(404).send('Line not found');
-    });
-  } else {
     fs.readFile(filePath, 'utf8', (err, data) => {
-      if (err) {
-        res.status(500).send('Internal Server Error');
-      } else {
-        res.send(data);
-      }
+        if (err) {
+            console.error('Error reading file:', err);
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('File not found');
+            return;
+        }
+
+        console.log('File Content:', data);
+
+        if (!lineNumber) {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end(data);
+        } else {
+            const lines = data.split('\n');
+            console.log(lines.length)
+            if (lineNumber <= lines.length) {
+                res.writeHead(200, { 'Content-Type': 'text/plain' });
+                res.end(lines[lineNumber - 1]);
+            } else {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('Line not found');
+            }
+        }
     });
-  }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
